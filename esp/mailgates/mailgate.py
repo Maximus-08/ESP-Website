@@ -32,6 +32,15 @@ if os.environ.get('VIRTUAL_ENV') is None:
 import django
 django.setup()
 from esp.dbmail.models import EmailList
+from esp.dbmail.mailgate_helpers import (
+    extract_attachments,
+    filter_recipients,
+    resolve_aliases,
+    resolve_recipients,
+    parse_sender_email,
+    lookup_sender,
+    build_email_body,
+)
 from django.conf import settings
 
 host = socket.gethostname()
