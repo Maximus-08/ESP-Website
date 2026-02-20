@@ -18,7 +18,6 @@ from esp.users.views.usersearch import *
 from esp.utils.web import render_to_response
 from esp.web.views.main import DefaultQSDView
 
-
 #   This is a huge hack while we figure out what to do about logins and cookies.
 #   - Michael P 12/28/2011
 def HttpMetaRedirect(location='/'):
@@ -243,24 +242,6 @@ def unsubscribe_oneclick(request, username, token):
     if request.POST.get("List-Unsubscribe") == "One-Click":
         return unsubscribe(request, username, token, oneclick = True)
     raise ESPError("Invalid oneclick data.")
-
-@admin_required
-def morph_into_user(request):
-    morph_user = ESPUser.objects.get(id=request.GET['morph_user'])
-    try:
-        onsite = Program.objects.get(id=request.GET['onsite'])
-    except (KeyError, ValueError, Program.DoesNotExist):
-        onsite = None
-    request.user.switch_to_user(request,
-                                morph_user,
-                                '/manage/userview?username=' + morph_user.username,
-                                'User Search for '+morph_user.name(),
-                                onsite is not None)
-
-    if onsite is not None:
-        return HttpResponseRedirect('/learn/%s/studentreg' % onsite.getUrlBase())
-    else:
-        return HttpResponseRedirect('/')
 
 class LoginHelpView(DefaultQSDView):
     template_name = "users/loginhelp.html"
