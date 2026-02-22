@@ -45,6 +45,15 @@ class AdminMorph(ProgramModuleObj):
             "choosable": 0,
         }
 
+    def useTemplate(self):
+        # The stub has no @main_call method, so ProgramModuleObj.useTemplate()
+        # would return True (because main_view is None), causing the dashboard
+        # to call getTemplate(), which returns None, which then crashes the
+        # template loader with TypeError: join() argument must be str or bytes,
+        # not 'NoneType'.  Explicitly returning False prevents the dashboard
+        # from trying to include a template for this stub module.
+        return False
+
     class Meta:
         # proxy=True matches how migration 0003 originally created this model
         # (AdminMorph was always a proxy of ProgramModuleObj with no own table).
