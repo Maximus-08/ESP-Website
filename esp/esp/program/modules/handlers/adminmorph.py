@@ -46,6 +46,13 @@ class AdminMorph(ProgramModuleObj):
         }
 
     class Meta:
+        # proxy=True matches how migration 0003 originally created this model
+        # (AdminMorph was always a proxy of ProgramModuleObj with no own table).
+        # Without it Django treats this as a concrete child and adds a
+        # `programmoduleobj_ptr` parent-pointer field, which ends up in the
+        # dir()-scan inside _get_views_by_call_tag and raises
+        # RelatedObjectDoesNotExist when accessed.
+        proxy = True
         # managed=False prevents Django from generating new migrations for this
         # stub after migration 0047_remove_adminmorph has deleted the model from
         # the migration state.  The class remains importable so that
