@@ -62,7 +62,10 @@
                 Student links<br/>
                 (for {{program.niceName}})
             </h2>
-            <a id="onsitelink" class="sidelink" href="/onsite/{{program.getUrlBase}}/schedule_students?user_id={{user.id}}">Onsite registration</a>
+            <form id="onsitelink-form" action="/onsite/{{program.getUrlBase}}/schedule_students" method="post" style="display:inline">{% csrf_token %}
+                <input type="hidden" name="user_id" value="{{user.id}}"/>
+                <a id="onsitelink" class="sidelink" onclick="$j(this).parent().submit();return false;" href="">Onsite registration</a>
+            </form>
             {% if profile.student_info and profile.id %}
                 {% if program|hasModule:"AccountingModule" %}
                     <a href="/manage/{{program.getUrlBase}}/accounting/{{user.id}}" class="sidelink">View accounting info</a>

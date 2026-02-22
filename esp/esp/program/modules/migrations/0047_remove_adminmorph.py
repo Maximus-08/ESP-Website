@@ -3,13 +3,11 @@ import os
 
 from django.db import migrations
 
-# Module-level list used to shuttle per-program M2M state when the forward and
-# reverse migrations execute within the same manage.py invocation.
-_affected_program_ids = []
-
-# Alongside the in-process list, we also write this state to a JSON file so
-# that a reverse migration running in a *different* process (e.g. after a
-# code rollback on a live server) can still restore per-program M2M links.
+# State is persisted to a JSON file so that both same-process and
+# cross-process reverse migrations can restore per-program M2M links.
+# The module-level mutable global previously used for same-process
+# round-trips has been removed: it was fragile for non-standard migration
+# runners and masked file-write failures that should be fatal.
 _STATE_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            '.adminmorph_state.json')
 
@@ -36,17 +34,18 @@ def remove_adminmorph_programmodule(apps, schema_editor):
             seen_ids.add(pid)
 
     ids = sorted(seen_ids)
-    # Keep in-process list up-to-date for same-process reverse migration.
-    _affected_program_ids[:] = ids
 
-    # Persist to disk so a reverse migration in a separate process can also
-    # restore the M2M links rather than silently dropping them.
+    # Persist to disk so the reverse migration (even in a separate process)
+    # can restore the M2M links rather than silently dropping them.  If the
+    # write fails AND there are programs to restore, raise so the migration
+    # does not silently destroy unrecoverable state.
     try:
         with open(_STATE_FILE, 'w') as fh:
             json.dump({'program_ids': ids}, fh)
     except OSError:
-        # Non-fatal: the in-process list is still available as a fallback.
-        pass
+        if ids:
+            raise  # Don't delete rows whose state cannot be saved.
+        # No programs were affected; nothing to restore on rollback.
 
     # Cascades to remove it from any Program.modules M2M relations automatically.
     adminmorph_qs.delete()
@@ -58,9 +57,8 @@ def restore_adminmorph_programmodule(apps, schema_editor):
 
     Re-inserts the ProgramModule registry entry and re-links every program
     that previously had AdminMorph installed.  The program IDs are read from
-    the in-process list (same-process rollback) or from the persisted JSON
-    file (cross-process rollback), so the M2M links are correctly restored
-    in either scenario.
+    the persisted JSON file (both same-process and cross-process rollback),
+    so the M2M links are correctly restored in either scenario.
     """
     ProgramModule = apps.get_model('program', 'ProgramModule')
     Program = apps.get_model('program', 'Program')
@@ -76,15 +74,16 @@ def restore_adminmorph_programmodule(apps, schema_editor):
         },
     )
 
-    # Prefer the in-process list; fall back to the persisted file.
-    ids_to_restore = list(_affected_program_ids)
-    if not ids_to_restore:
-        try:
-            with open(_STATE_FILE) as fh:
-                data = json.load(fh)
-            ids_to_restore = data.get('program_ids', [])
-        except (OSError, ValueError):
-            ids_to_restore = []
+    # Read program IDs from the persisted state file.  The file-based approach
+    # works for both same-process and cross-process rollbacks without relying
+    # on fragile module-level mutable global state.
+    ids_to_restore = []
+    try:
+        with open(_STATE_FILE) as fh:
+            data = json.load(fh)
+        ids_to_restore = data.get('program_ids', [])
+    except (OSError, ValueError):
+        ids_to_restore = []
 
     for program in Program.objects.filter(id__in=ids_to_restore):
         program.modules.add(am)

@@ -32,6 +32,8 @@ Learning Unlimited, Inc.
   Phone: 617-379-0178
   Email: web-team@learningu.org
 """
+import logging
+
 from django.http     import HttpResponseRedirect
 from esp.middleware  import ESPError
 from esp.users.views import search_for_user
@@ -39,6 +41,8 @@ from esp.program.modules.base import ProgramModuleObj, needs_student_in_grade, n
 from esp.program.modules.handlers.programprintables import ProgramPrintables
 from esp.users.models import ESPUser
 from esp.utils.models import Printer, PrintRequest
+
+logger = logging.getLogger(__name__)
 
 class OnsiteClassSchedule(ProgramModuleObj):
     doc = """Get and/or print a student's schedule for the program."""
@@ -87,13 +91,16 @@ class OnsiteClassSchedule(ProgramModuleObj):
         """ Redirect to student registration, having switched into the desired
         student.
 
-        When ``user_id`` is supplied as a GET parameter (e.g. from the User
-        View admin page) the student-search step is skipped and the caller is
-        taken directly to that student's onsite registration.  Without it the
-        standard search flow is used.
+        When ``user_id`` is supplied as a POST parameter (e.g. from the User
+        View admin page, which submits a CSRF-protected form) the student-search
+        step is skipped and the caller is taken directly to that student's onsite
+        registration.  Without it the standard search flow is used.
         """
 
-        user_id = request.GET.get('user_id')
+        # Read user_id from POST only — this requires a CSRF token, which
+        # prevents a third-party page from triggering an identity switch via
+        # a plain GET link (CSRF attack).
+        user_id = request.POST.get('user_id')
         if user_id:
             try:
                 user = ESPUser.objects.get(id=user_id)
@@ -105,8 +112,10 @@ class OnsiteClassSchedule(ProgramModuleObj):
                 if (user.isAdministrator() or user.is_staff or user.is_superuser
                         or not user.hasRole('Student')):
                     user_id = None
-            except (ESPUser.DoesNotExist, ValueError):
+            except (ESPUser.DoesNotExist, ValueError, OverflowError, TypeError):
                 # Fall through to the normal search rather than 500-ing.
+                # OverflowError/TypeError guard against backend-specific bad PK
+                # coercions (e.g. out-of-range integers, unexpected types).
                 user_id = None
 
         if not user_id:
@@ -124,7 +133,13 @@ class OnsiteClassSchedule(ProgramModuleObj):
             # Defensive: switch_to_user raises ESPError when the target is an
             # administrator.  The guard above should make this unreachable, but
             # catching it here ensures a single malformed request cannot
-            # repeatedly trigger a 500.
+            # repeatedly trigger a 500.  Log so the incident is observable.
+            logger.exception(
+                'switch_to_user raised ESPError for target user %r (id=%s); '
+                'redirecting to core URL instead of propagating.',
+                getattr(user, 'username', '?'),
+                getattr(user, 'pk', '?'),
+            )
             return HttpResponseRedirect(self.getCoreURL(tl))
 
         return HttpResponseRedirect('/learn/%s/studentreg' % self.program.getUrlBase())

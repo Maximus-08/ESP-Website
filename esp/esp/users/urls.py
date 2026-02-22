@@ -27,8 +27,12 @@ urlpatterns = [
         name='grade_change_request'),
     url(r'^makeadmin/?$', views.make_admin),
     url(r'^loginhelp', views.LoginHelpView.as_view(), name='Login Help'),
-    url(r'^unsubscribe/(?P<username>[\w.@+-]+)/(?P<token>[\w.:\-_=]+)/$', views.unsubscribe, name="unsubscribe"),
-    url(r'^unsubscribe_oneclick/(?P<username>[\w.@+-]+)/(?P<token>[\w.:\-_=]+)/$', views.unsubscribe_oneclick, name="unsubscribe_oneclick"),
+    # username uses [^/]+ (not the narrower [\w.@+-]+) to preserve routing for
+    # legacy usernames that may contain characters outside that charset.
+    url(r'^unsubscribe/(?P<username>[^/]+)/(?P<token>[\w.:\-_=]+)/$',
+        views.unsubscribe, name="unsubscribe"),
+    url(r'^unsubscribe_oneclick/(?P<username>[^/]+)/(?P<token>[\w.:\-_=]+)/$',
+        views.unsubscribe_oneclick, name="unsubscribe_oneclick"),
 ]
 
 urlpatterns += [
