@@ -22,6 +22,8 @@ esp/file_db/*
 esp/esp/database_settings.py.chicago
 esp/esp/database_settings.py.mit
 env
+venv/
+.venv/
 venv
 useful_logs
 theme_compiled.css
@@ -44,3 +46,4 @@ local_fabfile.py
 
 # Migration state file written by 0047_remove_adminmorph to support cross-process rollback
 esp/esp/program/modules/migrations/.adminmorph_state.json
+.docker-setup-done
