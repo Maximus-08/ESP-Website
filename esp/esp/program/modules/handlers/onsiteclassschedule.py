@@ -35,7 +35,7 @@ Learning Unlimited, Inc.
 import logging
 
 from django.http     import HttpResponseRedirect
-from esp.middleware  import ESPError
+from esp.middleware.esperrormiddleware import ESPError_Log, ESPError_NoLog
 from esp.users.views import search_for_user
 from esp.program.modules.base import ProgramModuleObj, needs_student_in_grade, needs_onsite, needs_onsite_no_switchback, main_call, aux_call
 from esp.program.modules.handlers.programprintables import ProgramPrintables
@@ -129,8 +129,9 @@ class OnsiteClassSchedule(ProgramModuleObj):
                                      self.getCoreURL(tl),
                                      'OnSite Registration!',
                                      True)
-        except ESPError:
-            # Defensive: switch_to_user raises ESPError when the target is an
+        except (ESPError_Log, ESPError_NoLog):
+            # Defensive: switch_to_user raises ESPError (which returns an
+            # ESPError_Log or ESPError_NoLog instance) when the target is an
             # administrator.  The guard above should make this unreachable, but
             # catching it here ensures a single malformed request cannot
             # repeatedly trigger a 500.  Log so the incident is observable.
